@@ -1,5 +1,6 @@
 package com.ivaalsolutions;
 
+import org.apache.poi.sl.usermodel.AutoNumberingScheme;
 import org.apache.poi.xslf.usermodel.XSLFTextParagraph;
 import org.apache.poi.xslf.usermodel.XSLFTextRun;
 import org.apache.poi.xslf.usermodel.XSLFTextShape;
@@ -12,8 +13,8 @@ import java.util.List;
 
 public class HtmlPoiConverter {
 
-    private static final List<String> PARAGRAPH_TAGS = List.of("p", "b", "i", "u", "li");
-    private static final List<String> RUN_TAGS = List.of("b", "i", "u");
+    private static final List<String> PARAGRAPH_TAGS = List.of("p", "b", "i", "u", "li", "strong", "em");
+    private static final List<String> RUN_TAGS = List.of("b", "i", "u", "strong", "em");
 
     public static void convertToPowerPoint(Document domTree, XSLFTextShape parentShape) {
         recursiveDFS(domTree.root(), parentShape);
@@ -37,12 +38,16 @@ public class HtmlPoiConverter {
 
             // Make a new PowerPoint paragraph element
             if (makeParagraph) {
-                // Text in paragraphs are bulleted by default. Only
+                // Text in paragraphs is bulleted by default. Only
                 // keep the default bulleting for list items.
                 boolean bulleted = tagName.equals("li");
+                boolean numbered = bulleted && element.parent().tagName().equals("ol");
 
                 XSLFTextParagraph p = parentShape.addNewTextParagraph();
-                p.setBullet(false);
+                p.setBullet(bulleted);
+                if (numbered) {
+                    p.setBulletAutoNumber(AutoNumberingScheme.arabicPeriod, 1);
+                }
 
                 // Does this tag require a text run because it's
                 // a formatting choice that cannot be applied at the
@@ -55,12 +60,11 @@ public class HtmlPoiConverter {
                     // e.g. Don't use r.setBold(tagName.equals("b"));
                     // Otherwise you might undo formatting performed by
                     // an outer, enclosing tag.
-                    if (tagName.equals("b"))
-                        r.setBold(true);
-                    else if (tagName.equals("i"))
-                        r.setItalic(true);
-                    else if (tagName.equals("u"))
-                        r.setUnderlined(true);
+                    switch (tagName) {
+                        case "b", "strong" -> r.setBold(true);
+                        case "i", "em" -> r.setItalic(true);
+                        case "u" -> r.setUnderlined(true);
+                    }
 
                     // Continue processing inner tags/text of the run
                     for (Node child : element.childNodes()) {
@@ -103,12 +107,11 @@ public class HtmlPoiConverter {
             if (makeRun) {
                 XSLFTextRun r = parentParagraph.addNewTextRun();
 
-                if (tagName.equals("b"))
-                    r.setBold(true);
-                else if (tagName.equals("i"))
-                    r.setItalic(true);
-                else if (tagName.equals("u"))
-                    r.setUnderlined(true);
+                switch (tagName) {
+                    case "b", "strong" -> r.setBold(true);
+                    case "i", "em" -> r.setItalic(true);
+                    case "u" -> r.setUnderlined(true);
+                }
 
                 for (Node child : element.childNodes()) {
                     recursiveDFS(child, r);
@@ -132,12 +135,11 @@ public class HtmlPoiConverter {
             // More nested tags to continue formatting the run
             // we're working in
             if (continueRun) {
-                if (tagName.equals("b"))
-                    parentRun.setBold(true);
-                else if (tagName.equals("i"))
-                    parentRun.setItalic(true);
-                else if (tagName.equals("u"))
-                    parentRun.setUnderlined(true);
+                switch (tagName) {
+                    case "b", "strong" -> parentRun.setBold(true);
+                    case "i", "em" -> parentRun.setItalic(true);
+                    case "u" -> parentRun.setUnderlined(true);
+                }
             }
 
             for (Node child : element.childNodes()) {
