@@ -20,9 +20,11 @@ public class HtmlPoiConverter {
     }
 
     private static void recursiveDFS(Node node, XSLFTextShape parentShape) {
+        // We have encountered a text node outside of a paragraph element
         if (node instanceof TextNode textNode) {
             if (textNode.text().trim().length() > 0) {
                 System.out.println("Text: " + textNode.text());
+                // Create the paragraph and run and set their text
                 XSLFTextParagraph p = parentShape.addNewTextParagraph();
                 p.setBullet(false);
                 XSLFTextRun r = p.addNewTextRun();
@@ -64,7 +66,8 @@ public class HtmlPoiConverter {
                     for (Node child : element.childNodes()) {
                         recursiveDFS(child, r);
                     }
-
+                    // Remove this element's children so they are not
+                    // double-processed by any outer recursive loop
                     element.empty();
                 } else {
                     // Continue processing inner tags/text of the paragraph
@@ -74,41 +77,9 @@ public class HtmlPoiConverter {
                     element.empty();
                 }
             }
-
-//            if (tagName.equalsIgnoreCase("p")) {
-//                XSLFTextParagraph p = parentShape.addNewTextParagraph();
-//                p.setBullet(false);
-//                for (Node child : element.childNodes()) {
-//                    recursiveDFS(child, p);
-//                }
-//                element.empty();
-//            } else if (tagName.equalsIgnoreCase("b")) {
-//                XSLFTextParagraph p = parentShape.addNewTextParagraph();
-//                p.setBullet(false);
-//                XSLFTextRun r = p.addNewTextRun();
-//                r.setBold(true);
-//                for (Node child : element.childNodes()) {
-//                    recursiveDFS(child, r);
-//                }
-//                element.empty();
-//            } else if (tagName.equalsIgnoreCase("i")) {
-//                XSLFTextParagraph p = parentShape.addNewTextParagraph();
-//                p.setBullet(false);
-//                XSLFTextRun r = p.addNewTextRun();
-//                r.setItalic(true);
-//                for (Node child : element.childNodes()) {
-//                    recursiveDFS(child, r);
-//                }
-//                element.empty();
-//            } else if (tagName.equalsIgnoreCase("li")) {
-//                XSLFTextParagraph p = parentShape.addNewTextParagraph();
-//                p.setBullet(true);
-//                for (Node child : element.childNodes()) {
-//                    recursiveDFS(child, p);
-//                }
-//                element.empty();
-//            }
         }
+
+        // Continue recursively processing remaining nodes
         for (Node child : node.childNodes()) {
             System.out.println(child.getClass() + ": " + child.nodeName());
             recursiveDFS(child, parentShape);
@@ -117,30 +88,28 @@ public class HtmlPoiConverter {
 
     private static void recursiveDFS(Node node, XSLFTextParagraph parentParagraph) {
         if (node instanceof TextNode textNode) {
+            // We have encountered a text node while having
+            // a paragraph element containing no text run
             if (textNode.text().trim().length() > 0) {
                 System.out.println("Text: " + textNode.text());
+                // Create the text run and set its text
                 XSLFTextRun r = parentParagraph.addNewTextRun();
                 r.setText(textNode.text());
             }
         } else if (node instanceof Element element) {
-            String tagName = element.tagName();
-            if (tagName.equalsIgnoreCase("b")) {
+            String tagName = element.tagName().toLowerCase();
+            boolean makeRun = RUN_TAGS.contains(tagName);
+
+            if (makeRun) {
                 XSLFTextRun r = parentParagraph.addNewTextRun();
-                r.setBold(true);
-                for (Node child : element.childNodes()) {
-                    recursiveDFS(child, r);
-                }
-                element.empty();
-            } else if (tagName.equalsIgnoreCase("i")) {
-                XSLFTextRun r = parentParagraph.addNewTextRun();
-                r.setItalic(true);
-                for (Node child : element.childNodes()) {
-                    recursiveDFS(child, r);
-                }
-                element.empty();
-            } else if (tagName.equalsIgnoreCase("u")) {
-                XSLFTextRun r = parentParagraph.addNewTextRun();
-                r.setUnderlined(true);
+
+                if (tagName.equals("b"))
+                    r.setBold(true);
+                else if (tagName.equals("i"))
+                    r.setItalic(true);
+                else if (tagName.equals("u"))
+                    r.setUnderlined(true);
+
                 for (Node child : element.childNodes()) {
                     recursiveDFS(child, r);
                 }
@@ -150,28 +119,31 @@ public class HtmlPoiConverter {
     }
 
     private static void recursiveDFS(Node node, XSLFTextRun parentRun) {
+        // We have encountered a text node inside a run
         if (node instanceof TextNode textNode) {
             if (textNode.text().trim().length() > 0) {
+                // Set the text
                 parentRun.setText(textNode.text());
             }
         } else if (node instanceof Element element) {
-            String tagName = element.tagName();
-            if (tagName.equalsIgnoreCase("b")) {
-                parentRun.setBold(true);
-                for (Node child : element.childNodes()) {
-                    recursiveDFS(child, parentRun);
-                }
-            } else if (tagName.equalsIgnoreCase("i")) {
-                parentRun.setItalic(true);
-                for (Node child : element.childNodes()) {
-                    recursiveDFS(child, parentRun);
-                }
-            } else if (tagName.equalsIgnoreCase("u")) {
-                parentRun.setUnderlined(true);
-                for (Node child : element.childNodes()) {
-                    recursiveDFS(child, parentRun);
-                }
+            String tagName = element.tagName().toLowerCase();
+            boolean continueRun = RUN_TAGS.contains(tagName);
+
+            // More nested tags to continue formatting the run
+            // we're working in
+            if (continueRun) {
+                if (tagName.equals("b"))
+                    parentRun.setBold(true);
+                else if (tagName.equals("i"))
+                    parentRun.setItalic(true);
+                else if (tagName.equals("u"))
+                    parentRun.setUnderlined(true);
             }
+
+            for (Node child : element.childNodes()) {
+                recursiveDFS(child, parentRun);
+            }
+
         }
     }
 }
