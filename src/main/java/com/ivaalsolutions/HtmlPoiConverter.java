@@ -18,8 +18,8 @@ public class HtmlPoiConverter {
     private static final double H3_REM = 1.5;
 
     private static final List<String> PARAGRAPH_TAGS =
-            List.of("p", "b", "i", "u", "li", "strong", "em", "h1", "h2", "h3");
-    private static final List<String> RUN_TAGS = List.of("b", "i", "u", "strong", "em", "h1", "h2", "h3");
+            List.of("p", "b", "i", "u", "li", "strong", "em", "h1", "h2", "h3", "#text");
+    private static final List<String> RUN_TAGS = List.of("b", "i", "u", "strong", "em", "h1", "h2", "h3", "#text");
 
     public static void convertToPowerPoint(Document domTree, XSLFTextShape parentShape) {
         recursiveDFS(domTree.root(), parentShape);
@@ -55,32 +55,10 @@ public class HtmlPoiConverter {
                     p.setBulletAutoNumber(AutoNumberingScheme.arabicPeriod, 1);
                 }
 
-                // TODO: Don't we always need a run here?
-
                 // Continue processing inner tags/text of the run
                 for (Node child : element.childNodes()) {
-                    // Does this tag require a text run because it's
-                    // a formatting choice that cannot be applied at the
-                    // paragraph level?
-                    boolean makeRun = RUN_TAGS.contains(tagName);
-                    if (makeRun) {
-                        XSLFTextRun r = p.addNewTextRun();
-
-                        // Only ever toggle a formatting to true, never false.
-                        // e.g. Don't use r.setBold(tagName.equals("b"));
-                        // Otherwise you might undo formatting performed by
-                        // an outer, enclosing tag.
-                        switch (tagName) {
-                            case "b", "strong" -> r.setBold(true);
-                            case "i", "em" -> r.setItalic(true);
-                            case "u" -> r.setUnderlined(true);
-                        }
-
-                        recursiveDFS(child, r);
-                    }
-                    // Remove this element's children so they are not
-                    // double-processed by any outer recursive loop
-                    element.empty();
+                    recursiveDFS(child, p);
+                    child.remove();
                 }
             }
         }
@@ -89,6 +67,7 @@ public class HtmlPoiConverter {
         for (Node child : node.childNodes()) {
             System.out.println(child.getClass() + ": " + child.nodeName());
             recursiveDFS(child, parentShape);
+            child.remove();
         }
     }
 
@@ -118,8 +97,8 @@ public class HtmlPoiConverter {
                         case "h3" -> r.setFontSize(r.getFontSize() * H3_REM);
                     }
                     recursiveDFS(child, r);
+                    child.remove();
                 }
-                element.empty();
             }
         }
     }
@@ -127,6 +106,7 @@ public class HtmlPoiConverter {
     private static void recursiveDFS(Node node, XSLFTextRun parentRun) {
         // We have encountered a text node inside a run
         if (node instanceof TextNode textNode) {
+            System.out.println("Text: " + textNode.text());
             if (textNode.text().trim().length() > 0) {
                 // Set the text
                 parentRun.setText(textNode.text());
@@ -147,6 +127,7 @@ public class HtmlPoiConverter {
 
             for (Node child : element.childNodes()) {
                 recursiveDFS(child, parentRun);
+                child.remove();
             }
 
         }
